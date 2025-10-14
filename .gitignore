@@ -23,13 +23,18 @@ dist/
 .idea/
 *.swp
 
-# Models
-models/
+# Trained Models (not code)
 *.safetensors
 *.ckpt
 *.pth
+trained_models/
 
 # Generated
 outputs/
 results/
 logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
