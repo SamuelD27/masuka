@@ -89,7 +89,7 @@ def train_flux_lora(self, session_id: str, config: dict):
         # Get the final checkpoint
         if result['checkpoints']:
             final_checkpoint = result['checkpoints'][-1]
-            storage_path = f"models/{str(session.user_id)}/{model_filename}"
+            storage_path = f"models/{session_id}/{model_filename}"
 
             success = storage_service.upload_file(
                 final_checkpoint,
@@ -106,7 +106,6 @@ def train_flux_lora(self, session_id: str, config: dict):
             # Create model entry
             model = Model(
                 training_session_id=session_id,
-                user_id=session.user_id,
                 name=session.name,
                 version='v1',
                 model_type='flux_image',
