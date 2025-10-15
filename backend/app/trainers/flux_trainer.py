@@ -125,15 +125,20 @@ class FluxTrainer(BaseTrainer):
         # Create config file
         config_path = self.create_config()
 
-        # Build command
-        train_script = self.simpletuner_path / 'train.py'
+        # Build command - SimpleTuner's train script is in simpletuner_sdk subdirectory
+        train_script = self.simpletuner_path / 'simpletuner_sdk' / 'train.py'
 
         # Check if train script exists
         if not train_script.exists():
-            raise FileNotFoundError(
-                f"SimpleTuner train script not found at {train_script}. "
-                f"Please ensure SimpleTuner is properly installed at {self.simpletuner_path}"
-            )
+            # Try old location as fallback
+            train_script_old = self.simpletuner_path / 'train.py'
+            if train_script_old.exists():
+                train_script = train_script_old
+            else:
+                raise FileNotFoundError(
+                    f"SimpleTuner train script not found at {train_script} or {train_script_old}. "
+                    f"Please ensure SimpleTuner is properly installed at {self.simpletuner_path}"
+                )
 
         cmd = [
             'python', str(train_script),
