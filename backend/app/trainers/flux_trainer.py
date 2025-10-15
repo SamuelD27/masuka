@@ -127,12 +127,23 @@ class FluxTrainer(BaseTrainer):
 
         # Build command
         train_script = self.simpletuner_path / 'train.py'
+
+        # Check if train script exists
+        if not train_script.exists():
+            raise FileNotFoundError(
+                f"SimpleTuner train script not found at {train_script}. "
+                f"Please ensure SimpleTuner is properly installed at {self.simpletuner_path}"
+            )
+
         cmd = [
             'python', str(train_script),
             '--config', config_path
         ]
 
         logger.info(f"Starting training with command: {' '.join(cmd)}")
+        logger.info(f"Config path: {config_path}")
+        logger.info(f"Dataset path: {self.dataset_path}")
+        logger.info(f"Output path: {self.output_path}")
 
         # Run training
         process = subprocess.Popen(
@@ -172,7 +183,11 @@ class FluxTrainer(BaseTrainer):
         return_code = process.wait()
 
         if return_code != 0:
-            raise Exception(f"Training failed with return code {return_code}")
+            error_msg = f"Training failed with return code {return_code}. Check logs at {self.output_path}/logs for details."
+            logger.error(error_msg)
+            logger.error(f"Command was: {' '.join(cmd)}")
+            logger.error(f"Working directory: {self.simpletuner_path}")
+            raise Exception(error_msg)
 
         # Get checkpoint paths
         checkpoints = self._get_checkpoints()
