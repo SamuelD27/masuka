@@ -28,17 +28,18 @@ async def create_dataset(
     # Create storage path
     storage_path = f"datasets/{dataset_id}"
 
+    # Prepare metadata
+    metadata = request.metadata or {}
+    if request.trigger_word:
+        metadata['trigger_word'] = request.trigger_word
+
     # Create dataset
     dataset = Dataset(
         id=dataset_id,
-        user_id=uuid.uuid4(),  # TODO: Get from auth when implemented
         name=request.name,
         storage_path=storage_path,
-        metadata=request.metadata or {}
+        dataset_metadata=metadata
     )
-
-    if request.trigger_word:
-        dataset.metadata['trigger_word'] = request.trigger_word
 
     db.add(dataset)
     db.commit()
@@ -54,7 +55,7 @@ async def create_dataset(
         video_count=dataset.video_count,
         is_processed=dataset.is_processed,
         captions_generated=dataset.captions_generated,
-        metadata=dataset.metadata,
+        metadata=dataset.dataset_metadata,
         created_at=dataset.created_at
     )
 
@@ -149,7 +150,7 @@ async def get_dataset(
         video_count=dataset.video_count,
         is_processed=dataset.is_processed,
         captions_generated=dataset.captions_generated,
-        metadata=dataset.metadata,
+        metadata=dataset.dataset_metadata,
         created_at=dataset.created_at
     )
 
