@@ -15,18 +15,33 @@ class StorageService:
         # Configure boto3 client with proper signature version
         boto_config = Config(
             signature_version='s3v4',
-            s3={'addressing_style': 'path'}
+            s3={'addressing_style': 'virtual'}  # Use virtual-hosted-style for AWS S3
         )
 
-        self.s3_client = boto3.client(
-            's3',
-            endpoint_url=settings.S3_ENDPOINT_URL,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            region_name=settings.S3_REGION,
-            config=boto_config
-        )
+        # Prepare client arguments
+        client_kwargs = {
+            'service_name': 's3',
+            'aws_access_key_id': settings.AWS_ACCESS_KEY_ID,
+            'aws_secret_access_key': settings.AWS_SECRET_ACCESS_KEY,
+            'region_name': settings.S3_REGION,
+            'config': boto_config
+        }
+
+        # Only add endpoint_url for non-AWS S3 (like Cloudflare R2)
+        # For AWS S3, boto3 will automatically use the correct regional endpoint
+        if settings.S3_ENDPOINT_URL and 'amazonaws.com' not in settings.S3_ENDPOINT_URL:
+            client_kwargs['endpoint_url'] = settings.S3_ENDPOINT_URL
+            # Use path-style for custom endpoints
+            boto_config = Config(
+                signature_version='s3v4',
+                s3={'addressing_style': 'path'}
+            )
+            client_kwargs['config'] = boto_config
+
+        self.s3_client = boto3.client(**client_kwargs)
         self.bucket = settings.S3_BUCKET
+
+        logger.info(f"Initialized S3 client for bucket '{self.bucket}' in region '{settings.S3_REGION}'")
 
     def upload_file(
         self,
