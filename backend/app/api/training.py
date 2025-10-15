@@ -25,7 +25,6 @@ async def start_flux_training(
 
     # Create training session
     session = TrainingSession(
-        user_id=dataset.user_id,
         name=request.name,
         model_type='flux_image',
         status='pending',
