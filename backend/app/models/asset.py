@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, JSON, Integer
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -16,10 +16,14 @@ class GeneratedAsset(Base):
     # Generation parameters
     prompt = Column(Text, nullable=True)
     negative_prompt = Column(Text, nullable=True)
-    parameters = Column(JSON, nullable=True)  # {steps, cfg_scale, seed, etc}
+    parameters = Column(JSON, nullable=True)  # {steps, cfg_scale, seed, output_paths, etc}
+
+    # File info
+    file_size_mb = Column(Integer, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
 
     # Relationships
     model = relationship("Model", backref="generated_assets")

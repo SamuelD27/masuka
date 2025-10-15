@@ -48,8 +48,10 @@ async def root():
     }
 
 # Import and include routers
-from app.api import datasets, training, progress
+from app.api import datasets, training, progress, generation, models
 
 app.include_router(datasets.router, prefix="/api/datasets", tags=["datasets"])
 app.include_router(training.router, prefix="/api/training", tags=["training"])
 app.include_router(progress.router, prefix="/api/progress", tags=["progress"])
+app.include_router(generation.router, prefix="/api/generate", tags=["generation"])
+app.include_router(models.router, prefix="/api/models", tags=["models"])
