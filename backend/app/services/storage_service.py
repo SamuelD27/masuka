@@ -1,5 +1,6 @@
 import boto3
 from botocore.exceptions import ClientError
+from botocore.config import Config
 from typing import Optional, BinaryIO
 import logging
 from pathlib import Path
@@ -11,12 +12,19 @@ class StorageService:
     """Handle file uploads/downloads to S3/Cloudflare R2."""
 
     def __init__(self):
+        # Configure boto3 client with proper signature version
+        boto_config = Config(
+            signature_version='s3v4',
+            s3={'addressing_style': 'path'}
+        )
+
         self.s3_client = boto3.client(
             's3',
             endpoint_url=settings.S3_ENDPOINT_URL,
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            region_name=settings.S3_REGION
+            region_name=settings.S3_REGION,
+            config=boto_config
         )
         self.bucket = settings.S3_BUCKET
 
@@ -41,8 +49,9 @@ class StorageService:
             logger.info(f"Uploaded {file_path} to {object_name}")
             return True
         except ClientError as e:
-            logger.error(f"Upload failed: {e}")
-            return False
+            error_msg = f"Upload failed for {file_path}: {e}"
+            logger.error(error_msg)
+            raise Exception(error_msg) from e
 
     def upload_fileobj(
         self,
