@@ -10,6 +10,7 @@ from pathlib import Path
 import logging
 import traceback
 import uuid
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,13 @@ class DatabaseTask(Task):
             self._db.close()
             self._db = None
 
-@celery_app.task(bind=True, base=DatabaseTask, name='app.tasks.generation_tasks.generate_image')
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    name='app.tasks.generation_tasks.generate_image',
+    time_limit=600,  # 10 minute hard limit
+    soft_time_limit=570  # 9.5 minute soft limit
+)
 def generate_image(self, job_id: str, config: dict):
     """
     Generate images using Flux with optional LoRA.
@@ -38,6 +45,8 @@ def generate_image(self, job_id: str, config: dict):
         config: Generation configuration dict
     """
     logger.info(f"Starting image generation for job {job_id}")
+    start_time = time.time()
+    timing_metrics = {}
 
     try:
         # Get job from database
@@ -63,14 +72,18 @@ def generate_image(self, job_id: str, config: dict):
         logger.info(f"Parameters: images={num_images}, steps={num_inference_steps}, guidance={guidance_scale}")
 
         # Get generator with error handling
+        model_load_start = time.time()
         try:
             generator = model_service.get_generator('flux')
         except Exception as e:
             logger.error(f"Failed to load base model: {e}")
             raise ValueError(f"Failed to load base model: {str(e)}")
+        timing_metrics['model_load_time'] = time.time() - model_load_start
+        logger.info(f"Model loaded in {timing_metrics['model_load_time']:.2f}s")
 
         # Load LoRA if specified
         if model_id:
+            lora_load_start = time.time()
             logger.info(f"Loading LoRA model {model_id}")
             model = self.db.query(Model).filter(Model.id == model_id).first()
 
@@ -94,11 +107,15 @@ def generate_image(self, job_id: str, config: dict):
                 logger.error(f"Failed to load LoRA: {e}")
                 raise ValueError(f"Failed to load LoRA {model.name}: {str(e)}")
 
+            timing_metrics['lora_load_time'] = time.time() - lora_load_start
+            logger.info(f"LoRA loaded in {timing_metrics['lora_load_time']:.2f}s")
+
         # Create output directory
         output_dir = Path(f"/tmp/masuka/generated/{job_id}")
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate images
+        generation_start = time.time()
         logger.info("Starting generation...")
         output_paths = generator.generate(
             prompt=prompt,
@@ -111,10 +128,11 @@ def generate_image(self, job_id: str, config: dict):
             seed=seed,
             output_dir=str(output_dir)
         )
-
-        logger.info(f"Generated {len(output_paths)} images")
+        timing_metrics['generation_time'] = time.time() - generation_start
+        logger.info(f"Generated {len(output_paths)} images in {timing_metrics['generation_time']:.2f}s")
 
         # Upload to storage
+        upload_start = time.time()
         storage_paths = []
         for i, local_path in enumerate(output_paths):
             storage_path = f"generated/{job_id}/image_{i+1}.png"
@@ -128,12 +146,19 @@ def generate_image(self, job_id: str, config: dict):
                 storage_paths.append(storage_path)
                 logger.info(f"Uploaded to {storage_path}")
 
+        timing_metrics['upload_time'] = time.time() - upload_start
+        timing_metrics['total_time'] = time.time() - start_time
+
+        logger.info(f"Upload completed in {timing_metrics['upload_time']:.2f}s")
+        logger.info(f"Total generation time: {timing_metrics['total_time']:.2f}s")
+
         # Update asset with success status
         asset.storage_path = storage_paths[0] if storage_paths else ""
         if asset.parameters is None:
             asset.parameters = {}
         asset.parameters['status'] = 'completed'
         asset.parameters['output_paths'] = storage_paths
+        asset.parameters['timing_metrics'] = timing_metrics
         asset.completed_at = datetime.utcnow()
         self.db.commit()
 
@@ -142,7 +167,8 @@ def generate_image(self, job_id: str, config: dict):
         return {
             'job_id': job_id,
             'status': 'completed',
-            'output_paths': storage_paths
+            'output_paths': storage_paths,
+            'timing_metrics': timing_metrics
         }
 
     except Exception as e:
