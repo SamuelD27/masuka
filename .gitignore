@@ -4,15 +4,11 @@ __pycache__/
 *$py.class
 *.so
 .Python
-venv/
 env/
+venv/
 *.egg-info/
-.pytest_cache/
-
-# Node
-node_modules/
 dist/
-.DS_Store
+build/
 
 # Environment
 .env
@@ -22,19 +18,28 @@ dist/
 .vscode/
 .idea/
 *.swp
+*.swo
 
-# Trained Models (not code)
-*.safetensors
-*.ckpt
-*.pth
-trained_models/
+# OS
+.DS_Store
+Thumbs.db
 
-# Generated
-outputs/
-results/
-logs/
+# Logs
+*.log
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+
+# Temporary
+/tmp/
+*.tmp
+*.bak
+
+# Docker
+*.pid
+
+# Alembic
+alembic/versions/*.py
+!alembic/versions/__init__.py

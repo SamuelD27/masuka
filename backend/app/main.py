@@ -47,4 +47,9 @@ async def root():
         "health": "/health"
     }
 
-# Future routers will be added here (training, models, generation, etc.)
+# Import and include routers
+from app.api import datasets, training, progress
+
+app.include_router(datasets.router, prefix="/api/datasets", tags=["datasets"])
+app.include_router(training.router, prefix="/api/training", tags=["training"])
+app.include_router(progress.router, prefix="/api/progress", tags=["progress"])

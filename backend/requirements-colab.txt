@@ -1,0 +1,30 @@
+# MASUKA V2 - Colab Requirements
+# These versions are compatible with Colab's pre-installed packages
+
+# Core - Compatible with Colab defaults
+fastapi>=0.115.0
+uvicorn[standard]>=0.31.1
+pydantic>=2.11.0
+pydantic-settings>=2.5.2
+python-multipart>=0.0.18
+
+# Database
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Task Queue
+redis==5.0.1
+celery==5.3.6
+flower==2.0.1
+kombu==5.3.5
+
+# Storage
+boto3>=1.34.34
+
+# Utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Networking (for ngrok)
+pyngrok

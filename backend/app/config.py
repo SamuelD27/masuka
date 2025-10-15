@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # Hugging Face
     HF_TOKEN: Optional[str] = None
 
+    # ngrok (optional, only used in Colab)
+    NGROK_AUTH_TOKEN: Optional[str] = None
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Convert CORS_ORIGINS string to list."""
@@ -56,5 +59,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # Ignore extra fields from .env
 
 settings = Settings()
