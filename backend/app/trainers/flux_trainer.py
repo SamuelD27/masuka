@@ -125,8 +125,8 @@ class FluxTrainer(BaseTrainer):
         # Create config file
         config_path = self.create_config()
 
-        # Build command - SimpleTuner's train script is in simpletuner_sdk subdirectory
-        train_script = self.simpletuner_path / 'simpletuner_sdk' / 'train.py'
+        # Build command - SimpleTuner's train script is in simpletuner subdirectory
+        train_script = self.simpletuner_path / 'simpletuner' / 'train.py'
 
         # Check if train script exists
         if not train_script.exists():
