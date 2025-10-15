@@ -78,11 +78,16 @@ class FluxGenerator(BaseGenerator):
             raise
 
     def unload_lora(self):
-        """Unload current LoRA."""
+        """Unload current LoRA and clear CUDA cache."""
         if self.lora_loaded and self.pipeline is not None:
             logger.info("Unloading LoRA")
             self.pipeline.unfuse_lora()
             self.lora_loaded = False
+
+            # Clear CUDA cache to prevent memory leaks
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.info("CUDA cache cleared after LoRA unload")
 
     def generate(
         self,
@@ -157,10 +162,18 @@ class FluxGenerator(BaseGenerator):
                 output_paths.append(str(filepath))
                 logger.info(f"Saved image to {filepath}")
 
+            # Clear CUDA cache after generation to prevent memory leaks
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.info("CUDA cache cleared after generation")
+
             return output_paths
 
         except Exception as e:
             logger.error(f"Generation failed: {e}")
+            # Clear CUDA cache even on error
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             raise
 
     def unload_model(self):

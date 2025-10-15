@@ -62,8 +62,12 @@ def generate_image(self, job_id: str, config: dict):
         logger.info(f"Prompt: {prompt}")
         logger.info(f"Parameters: images={num_images}, steps={num_inference_steps}, guidance={guidance_scale}")
 
-        # Get generator
-        generator = model_service.get_generator('flux')
+        # Get generator with error handling
+        try:
+            generator = model_service.get_generator('flux')
+        except Exception as e:
+            logger.error(f"Failed to load base model: {e}")
+            raise ValueError(f"Failed to load base model: {str(e)}")
 
         # Load LoRA if specified
         if model_id:
@@ -73,13 +77,22 @@ def generate_image(self, job_id: str, config: dict):
             if not model:
                 raise ValueError(f"Model {model_id} not found")
 
-            generator = model_service.load_lora_for_generation(
-                model_id=str(model.id),
-                storage_path=model.storage_path,
-                weight=lora_weight
-            )
+            try:
+                # Unload any existing LoRA before loading new one
+                if generator.lora_loaded:
+                    logger.info("Unloading previous LoRA")
+                    generator.unload_lora()
 
-            logger.info(f"LoRA loaded: {model.name}")
+                generator = model_service.load_lora_for_generation(
+                    model_id=str(model.id),
+                    storage_path=model.storage_path,
+                    weight=lora_weight
+                )
+
+                logger.info(f"LoRA loaded: {model.name}")
+            except Exception as e:
+                logger.error(f"Failed to load LoRA: {e}")
+                raise ValueError(f"Failed to load LoRA {model.name}: {str(e)}")
 
         # Create output directory
         output_dir = Path(f"/tmp/masuka/generated/{job_id}")
@@ -115,8 +128,11 @@ def generate_image(self, job_id: str, config: dict):
                 storage_paths.append(storage_path)
                 logger.info(f"Uploaded to {storage_path}")
 
-        # Update asset
+        # Update asset with success status
         asset.storage_path = storage_paths[0] if storage_paths else ""
+        if asset.parameters is None:
+            asset.parameters = {}
+        asset.parameters['status'] = 'completed'
         asset.parameters['output_paths'] = storage_paths
         asset.completed_at = datetime.utcnow()
         self.db.commit()
@@ -133,14 +149,29 @@ def generate_image(self, job_id: str, config: dict):
         logger.error(f"Generation failed: {str(e)}")
         logger.error(traceback.format_exc())
 
-        # Update asset with error
-        asset = self.db.query(GeneratedAsset).filter(
-            GeneratedAsset.id == job_id
-        ).first()
+        # Update asset with error status
+        try:
+            asset = self.db.query(GeneratedAsset).filter(
+                GeneratedAsset.id == job_id
+            ).first()
 
-        if asset:
-            asset.parameters['error'] = str(e)
-            asset.completed_at = datetime.utcnow()
-            self.db.commit()
+            if asset:
+                # Store error details in parameters
+                if asset.parameters is None:
+                    asset.parameters = {}
 
+                asset.parameters['status'] = 'failed'
+                asset.parameters['error'] = str(e)
+                asset.parameters['error_traceback'] = traceback.format_exc()
+                asset.completed_at = datetime.utcnow()
+
+                self.db.commit()
+                logger.info(f"Updated asset {job_id} with error status")
+            else:
+                logger.warning(f"Asset {job_id} not found for error update")
+
+        except Exception as update_error:
+            logger.error(f"Failed to update asset with error: {update_error}")
+
+        # Re-raise original exception
         raise

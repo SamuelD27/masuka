@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Optional, Dict, Any
 import logging
+import fcntl
+import time
 from app.services.storage_service import storage_service
 from app.generators.flux_generator import FluxGenerator
 
@@ -44,7 +46,7 @@ class ModelService:
 
     def download_model(self, storage_path: str) -> str:
         """
-        Download model from storage to local cache.
+        Download model from storage to local cache with file locking.
 
         Args:
             storage_path: S3/R2 path to model
@@ -54,21 +56,41 @@ class ModelService:
         """
         filename = Path(storage_path).name
         local_path = self.cache_dir / filename
+        lock_path = self.cache_dir / f"{filename}.lock"
 
-        # Check if already cached
-        if local_path.exists():
-            logger.info(f"Model already cached at {local_path}")
+        # Create lock file
+        lock_file = open(lock_path, 'w')
+
+        try:
+            # Try to acquire exclusive lock
+            logger.info(f"Acquiring lock for {filename}")
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+
+            # Check if already cached (after acquiring lock)
+            if local_path.exists():
+                logger.info(f"Model already cached at {local_path}")
+                return str(local_path)
+
+            # Download from storage
+            logger.info(f"Downloading model from {storage_path}")
+            success = storage_service.download_file(storage_path, str(local_path))
+
+            if not success:
+                raise Exception(f"Failed to download model from {storage_path}")
+
+            logger.info(f"Model downloaded to {local_path}")
             return str(local_path)
 
-        # Download from storage
-        logger.info(f"Downloading model from {storage_path}")
-        success = storage_service.download_file(storage_path, str(local_path))
+        finally:
+            # Release lock and close file
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            lock_file.close()
 
-        if not success:
-            raise Exception(f"Failed to download model from {storage_path}")
-
-        logger.info(f"Model downloaded to {local_path}")
-        return str(local_path)
+            # Clean up lock file
+            try:
+                lock_path.unlink(missing_ok=True)
+            except Exception as e:
+                logger.warning(f"Failed to remove lock file: {e}")
 
     def load_lora_for_generation(
         self,
